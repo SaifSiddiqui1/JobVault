@@ -49,10 +49,36 @@ const premiumOrAdmin = (req, res, next) => {
     });
 };
 
-const generateToken = (id) => {
-    return jwt.sign({ id }, process.env.JWT_SECRET, {
+const generateToken = (id, type = 'user') => {
+    return jwt.sign({ id, type }, process.env.JWT_SECRET, {
         expiresIn: process.env.JWT_EXPIRES_IN || '7d',
     });
 };
 
-module.exports = { protect, adminOnly, premiumOrAdmin, generateToken };
+const Employer = require('../models/Employer');
+
+const protectEmployer = async (req, res, next) => {
+    try {
+        const token = req.headers.authorization?.startsWith('Bearer ')
+            ? req.headers.authorization.split(' ')[1]
+            : null;
+
+        if (!token) return res.status(401).json({ success: false, message: 'Not authorized. No token.' });
+
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        if (decoded.type !== 'employer') {
+            return res.status(401).json({ success: false, message: 'Invalid token type.' });
+        }
+
+        const employer = await Employer.findById(decoded.id);
+        if (!employer) return res.status(401).json({ success: false, message: 'Employer not found.' });
+
+        req.employer = employer;
+        next();
+    } catch (err) {
+        return res.status(401).json({ success: false, message: 'Invalid or expired token.' });
+    }
+};
+
+module.exports = { protect, adminOnly, premiumOrAdmin, generateToken, protectEmployer };
+

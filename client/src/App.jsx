@@ -2,10 +2,12 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useEffect } from 'react'
 import useAuthStore from './store/authStore'
 import useAdminAuthStore from './store/adminAuthStore'
+import useEmployerAuthStore from './store/employerAuthStore'
 
 // Layouts
 import DashboardLayout from './components/layout/DashboardLayout'
 import AdminLayout from './components/layout/AdminLayout'
+import EmployerLayout from './components/layout/EmployerLayout'
 
 // Public pages
 import LandingPage from './pages/public/LandingPage'
@@ -35,6 +37,15 @@ import AdminUsers from './pages/admin/AdminUsers'
 import AdminStudy from './pages/admin/AdminStudy'
 import AdminLoginPage from './pages/admin/AdminLoginPage'
 import AdminJobDetailPage from './pages/admin/AdminJobDetailPage'
+import AdminEmployers from './pages/admin/AdminEmployers'
+
+// Employer pages
+import EmployerSignupPage from './pages/employer/EmployerSignupPage'
+import EmployerLoginPage from './pages/employer/EmployerLoginPage'
+import EmployerDashboard from './pages/employer/EmployerDashboard'
+import PostJobPage from './pages/employer/PostJobPage'
+import EmployerJobsPage from './pages/employer/EmployerJobsPage'
+import EmployerProfilePage from './pages/employer/EmployerProfilePage'
 
 // Guards
 const PrivateRoute = ({ children }) => {
@@ -47,6 +58,11 @@ const AdminRoute = ({ children }) => {
   if (!isAdminAuthenticated) return <Navigate to="/admin/login" replace />
   if (!isAdminRole()) return <Navigate to="/admin/login" replace />
   return children
+}
+
+const EmployerRoute = ({ children }) => {
+  const { employer, employerToken } = useEmployerAuthStore()
+  return (employer && employerToken) ? children : <Navigate to="/employer/login" replace />
 }
 
 const PublicOnlyRoute = ({ children }) => {
@@ -100,6 +116,17 @@ export default function App() {
           <Route path="jobs/:id" element={<AdminJobDetailPage />} />
           <Route path="users" element={<AdminUsers />} />
           <Route path="study" element={<AdminStudy />} />
+          <Route path="employers" element={<AdminEmployers />} />
+        </Route>
+
+        {/* Employer Portal */}
+        <Route path="/employer/signup" element={<EmployerSignupPage />} />
+        <Route path="/employer/login" element={<EmployerLoginPage />} />
+        <Route path="/employer" element={<EmployerRoute><EmployerLayout /></EmployerRoute>}>
+          <Route path="dashboard" element={<EmployerDashboard />} />
+          <Route path="post-job" element={<PostJobPage />} />
+          <Route path="jobs" element={<EmployerJobsPage />} />
+          <Route path="profile" element={<EmployerProfilePage />} />
         </Route>
 
         {/* Fallback */}

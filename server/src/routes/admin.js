@@ -220,4 +220,64 @@ router.delete('/study/:id', async (req, res, next) => {
     } catch (err) { next(err); }
 });
 
+// ─── Employer Management ─────────────────────────────────────────────────────
+const Employer = require('../models/Employer');
+const { sendEmail } = require('../services/emailService');
+
+router.get('/employers', protect, adminOnly, async (req, res, next) => {
+    try {
+        const { status, search } = req.query;
+        const filter = {};
+        if (status) filter.verificationStatus = status;
+        if (search) filter.companyName = { $regex: search, $options: 'i' };
+        const employers = await Employer.find(filter).sort({ createdAt: -1 });
+        res.json({ success: true, data: employers });
+    } catch (err) { next(err); }
+});
+
+router.put('/employers/:id/verify', protect, adminOnly, async (req, res, next) => {
+    try {
+        const employer = await Employer.findByIdAndUpdate(req.params.id,
+            { verificationStatus: 'verified', verifiedAt: new Date(), verifiedBy: req.user._id },
+            { new: true }
+        );
+        if (!employer) return res.status(404).json({ success: false, message: 'Employer not found.' });
+
+        // Notify employer
+        await sendEmail({
+            to: employer.email,
+            subject: '🎉 Your JobVault Employer Account is Verified!',
+            html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">
+                <h2 style="color:#4f46e5">You're verified! 🚀</h2>
+                <p>Congratulations <strong>${employer.contactName}</strong>! Your company <strong>${employer.companyName}</strong> has been verified on JobVault.</p>
+                <p>You can now <a href="${process.env.CLIENT_URL}/employer/post-job" style="color:#4f46e5;font-weight:bold">post jobs</a> and reach thousands of talented candidates.</p>
+                <p>Happy hiring! 🎯</p></div>`,
+        });
+
+        res.json({ success: true, message: 'Employer verified.', data: employer });
+    } catch (err) { next(err); }
+});
+
+router.put('/employers/:id/reject', protect, adminOnly, async (req, res, next) => {
+    try {
+        const { reason } = req.body;
+        const employer = await Employer.findByIdAndUpdate(req.params.id,
+            { verificationStatus: 'rejected', rejectionReason: reason },
+            { new: true }
+        );
+        if (!employer) return res.status(404).json({ success: false, message: 'Employer not found.' });
+
+        await sendEmail({
+            to: employer.email,
+            subject: 'JobVault Employer Account — Verification Update',
+            html: `<p>Hi ${employer.contactName}, unfortunately your employer account for <strong>${employer.companyName}</strong> was not verified at this time.</p>
+                   <p><strong>Reason:</strong> ${reason || 'Not specified'}</p>
+                   <p>Please update your company profile and contact us if you have any questions.</p>`,
+        });
+
+        res.json({ success: true, message: 'Employer rejected.' });
+    } catch (err) { next(err); }
+});
+
 module.exports = router;
+

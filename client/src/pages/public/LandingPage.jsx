@@ -95,6 +95,41 @@ export default function LandingPage() {
                 </div>
             </section>
 
+            {/* ─── FOR EMPLOYERS ─── */}
+            <section className="py-20 px-4 bg-gradient-to-br from-indigo-600 to-purple-700 relative overflow-hidden">
+                <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 20% 50%, white 0%, transparent 60%)' }} />
+                <div className="relative max-w-5xl mx-auto flex flex-col md:flex-row items-center gap-10 md:gap-16">
+                    <div className="flex-1 text-center md:text-left">
+                        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/20 border border-white/30 text-white/90 text-sm font-semibold mb-6">
+                            🏢 For Employers &amp; Recruiters
+                        </div>
+                        <h2 className="font-heading text-3xl md:text-4xl font-extrabold text-white leading-tight mb-4">
+                            Hire Top Talent.<br />
+                            <span className="text-yellow-300">Post Jobs for Free.</span>
+                        </h2>
+                        <p className="text-indigo-200 text-lg max-w-lg mb-8">
+                            Reach thousands of qualified job seekers daily. Free posting for startups &amp; early-stage companies. Jobs go live within hours after a quick verification.
+                        </p>
+                        <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
+                            <Link to="/employer/signup" className="bg-white text-indigo-700 hover:bg-indigo-50 font-bold px-8 py-4 rounded-xl transition-all shadow-xl flex items-center justify-center gap-2">
+                                Post a Job Free →
+                            </Link>
+                            <Link to="/employer/login" className="border-2 border-white/50 text-white hover:bg-white/10 font-semibold px-8 py-4 rounded-xl transition-all flex items-center justify-center gap-2">
+                                Employer Login
+                            </Link>
+                        </div>
+                    </div>
+                    <div className="flex-shrink-0 grid grid-cols-1 gap-4 w-full md:w-72">
+                        {[{ emoji: '⚡', t: 'Quick Setup', d: 'Listed in under 5 minutes' }, { emoji: '🎯', t: 'Targeted Reach', d: 'Job seekers actively looking' }, { emoji: '✅', t: 'Admin Verified', d: 'Quality-checked job board' }].map(item => (
+                            <div key={item.t} className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-4 flex items-center gap-4">
+                                <div className="text-2xl">{item.emoji}</div>
+                                <div><p className="font-semibold text-white text-sm">{item.t}</p><p className="text-indigo-200 text-xs mt-0.5">{item.d}</p></div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </section>
+
             {/* How it works */}
             <section className="py-20 px-4 bg-gray-50 dark:bg-gray-900">
                 <div className="max-w-4xl mx-auto">

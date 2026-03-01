@@ -134,4 +134,47 @@ export const paymentAPI = {
     verifyPayment: (data) => api.post('/payment/verify', data)
 }
 
+// ─── Employer ─────────────────────────────────────────────────
+import useEmployerAuthStore from '../store/employerAuthStore';
+
+const employerApi = axios.create({
+    baseURL: import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api',
+    headers: { 'Content-Type': 'application/json' },
+    timeout: 30000,
+});
+employerApi.interceptors.request.use((config) => {
+    const token = useEmployerAuthStore.getState().employerToken;
+    if (token) config.headers.Authorization = `Bearer ${token}`;
+    return config;
+});
+employerApi.interceptors.response.use(
+    (res) => res.data,
+    (err) => Promise.reject(err)
+);
+
+export const employerAPI = {
+    // Auth
+    register: (data) => employerApi.post('/employer/register', data),
+    verifyOtp: (data) => employerApi.post('/employer/verify-otp', data),
+    resendOtp: (data) => employerApi.post('/employer/resend-otp', data),
+    login: (data) => employerApi.post('/employer/login', data),
+    // Profile
+    getMe: () => employerApi.get('/employer/me'),
+    updateProfile: (data) => employerApi.put('/employer/profile', data),
+    // Dashboard
+    getDashboard: () => employerApi.get('/employer/dashboard'),
+    // Jobs
+    getJobs: (params) => employerApi.get('/employer/jobs', { params }),
+    postJob: (data) => employerApi.post('/employer/jobs', data),
+    updateJob: (id, data) => employerApi.put(`/employer/jobs/${id}`, data),
+    deleteJob: (id) => employerApi.delete(`/employer/jobs/${id}`),
+}
+
+// ─── Admin Employer Mgmt (uses admin api instance) ────────────
+export const adminEmployerAPI = {
+    getEmployers: (params) => api.get('/admin/employers', { params }),
+    verifyEmployer: (id) => api.put(`/admin/employers/${id}/verify`),
+    rejectEmployer: (id, reason) => api.put(`/admin/employers/${id}/reject`, { reason }),
+}
+
 export default api
