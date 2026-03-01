@@ -1,18 +1,33 @@
-const { Resend } = require('resend');
+const nodemailer = require('nodemailer');
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// ─── Titan Email SMTP Transport ───────────────────────────────────────────────
+const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST || 'smtp.titan.email',
+    port: parseInt(process.env.SMTP_PORT || '587'),
+    secure: false, // true for port 465, false for 587
+    auth: {
+        user: process.env.SMTP_USER || 'jobvault@jobvault.live',
+        pass: process.env.SMTP_PASS,
+    },
+    tls: {
+        rejectUnauthorized: false,
+    },
+});
+
+const FROM_NAME = 'JobVault';
+const FROM_EMAIL = process.env.SMTP_USER || 'jobvault@jobvault.live';
 
 const sendEmail = async ({ to, subject, html, text }) => {
     try {
-        const { data, error } = await resend.emails.send({
-            from: process.env.FROM_EMAIL || 'JobVault <noreply@jobvault.app>',
+        const info = await transporter.sendMail({
+            from: `"${FROM_NAME}" <${FROM_EMAIL}>`,
             to,
             subject,
             html,
             text,
         });
-        if (error) throw new Error(error.message);
-        return data;
+        console.log('Email sent:', info.messageId);
+        return info;
     } catch (err) {
         console.error('Email send error:', err.message);
         // Don't throw — email failure shouldn't crash the request
