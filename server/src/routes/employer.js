@@ -37,6 +37,7 @@ router.post('/register', async (req, res) => {
             contactName, companyName, email, password,
             companyWebsite, industry, companySize,
             otp, otpExpires,
+            isEmailVerified: true, // Auto-verify — admin verification is the real gate
         });
 
         // Respond immediately — don't block on email
@@ -143,9 +144,7 @@ router.post('/login', async (req, res) => {
         const isMatch = await employer.comparePassword(password);
         if (!isMatch) return res.status(401).json({ success: false, message: 'Invalid email or password.' });
 
-        if (!employer.isEmailVerified) {
-            return res.status(403).json({ success: false, message: 'Please verify your email first.', needsVerification: true, employerId: employer._id });
-        }
+        // Email verification removed — admin verification is the real security gate
 
         const token = generateEmployerToken(employer._id);
 
