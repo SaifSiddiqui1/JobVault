@@ -9,26 +9,26 @@ export default function AdminLoginPage() {
     const navigate = useNavigate()
     const { setAdminAuth, isAdminAuthenticated, isAdminRole } = useAdminAuthStore()
 
-    // If already logged in as admin, redirect straight to admin panel
-    if (isAdminAuthenticated && isAdminRole()) {
-        navigate('/admin', { replace: true })
-        return null
-    }
-
     const [form, setForm] = useState({ email: '', password: '' })
     const [showPw, setShowPw] = useState(false)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
 
     // Forgot password state
-    const [forgotMode, setForgotMode] = useState(false) // show forgot password UI
-    const [forgotStep, setForgotStep] = useState(1)      // 1=email, 2=otp+newpw, 3=done
+    const [forgotMode, setForgotMode] = useState(false)
+    const [forgotStep, setForgotStep] = useState(1)
     const [forgotEmail, setForgotEmail] = useState('')
     const [forgotUserId, setForgotUserId] = useState('')
     const [forgotOtp, setForgotOtp] = useState('')
     const [newPassword, setNewPassword] = useState('')
     const [forgotLoading, setForgotLoading] = useState(false)
     const [forgotError, setForgotError] = useState('')
+
+    // If already logged in as admin, redirect (after all hooks)
+    if (isAdminAuthenticated && isAdminRole()) {
+        navigate('/admin', { replace: true })
+        return null
+    }
 
     const handleSubmit = async (e) => {
         e.preventDefault()
