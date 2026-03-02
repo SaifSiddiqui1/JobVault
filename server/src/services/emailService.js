@@ -12,6 +12,9 @@ const transporter = nodemailer.createTransport({
     tls: {
         rejectUnauthorized: false,
     },
+    connectionTimeout: 5000, // 5s — fail fast if SMTP not reachable
+    greetingTimeout: 5000,
+    socketTimeout: 10000,
 });
 
 const FROM_NAME = 'JobVault';

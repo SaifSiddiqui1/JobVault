@@ -39,8 +39,15 @@ router.post('/register', async (req, res) => {
             otp, otpExpires,
         });
 
-        // Send OTP email
-        await sendEmail({
+        // Respond immediately — don't block on email
+        res.status(201).json({
+            success: true,
+            message: 'Account created! Please check your email for the verification code.',
+            employerId: employer._id,
+        });
+
+        // Fire-and-forget OTP email (don't await)
+        sendEmail({
             to: email,
             subject: 'Verify your JobVault Employer Account',
             html: `
@@ -55,13 +62,7 @@ router.post('/register', async (req, res) => {
                     </div>
                     <p style="color: #6b7280;">If you did not create this account, please ignore this email.</p>
                 </div>`,
-        });
-
-        res.status(201).json({
-            success: true,
-            message: 'Account created! Please check your email for the verification code.',
-            employerId: employer._id,
-        });
+        }).catch(err => console.error('OTP email failed (non-blocking):', err.message));
     } catch (err) {
         console.error('Employer register error:', err);
         res.status(500).json({ success: false, message: err.message });
