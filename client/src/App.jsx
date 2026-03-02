@@ -119,9 +119,9 @@ export default function App() {
           <Route path="employers" element={<AdminEmployers />} />
         </Route>
 
-        {/* Employer Portal */}
-        <Route path="/employer/signup" element={<EmployerSignupPage />} />
-        <Route path="/employer/login" element={<EmployerLoginPage />} />
+        {/* Employer auth redirects — login/signup now unified */}
+        <Route path="/employer/signup" element={<Navigate to="/signup" replace />} />
+        <Route path="/employer/login" element={<Navigate to="/login" replace />} />
         <Route path="/employer" element={<EmployerRoute><EmployerLayout /></EmployerRoute>}>
           <Route path="dashboard" element={<EmployerDashboard />} />
           <Route path="post-job" element={<PostJobPage />} />
