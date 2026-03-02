@@ -125,6 +125,7 @@ export default function App() {
         <Route path="/employer" element={<EmployerRoute><EmployerLayout /></EmployerRoute>}>
           <Route path="dashboard" element={<EmployerDashboard />} />
           <Route path="post-job" element={<PostJobPage />} />
+          <Route path="jobs/:id/edit" element={<PostJobPage />} />
           <Route path="jobs" element={<EmployerJobsPage />} />
           <Route path="profile" element={<EmployerProfilePage />} />
         </Route>

@@ -6,6 +6,8 @@ const Employer = require('../models/Employer');
 const Job = require('../models/Job');
 const { protectEmployer } = require('../middleware/auth');
 const { sendEmail } = require('../services/emailService');
+const { uploadResume } = require('../middleware/upload');
+const { uploadBuffer } = require('../config/cloudinary');
 
 // Helper: generate OTP
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
@@ -227,8 +229,19 @@ router.get('/jobs', protectEmployer, async (req, res) => {
     }
 });
 
-// ─── POST NEW JOB ─────────────────────────────────────────
-router.post('/jobs', protectEmployer, async (req, res) => {
+// ─── GET SINGLE JOB (for edit form) ───────────────────────
+router.get('/jobs/:id', protectEmployer, async (req, res) => {
+    try {
+        const job = await Job.findOne({ _id: req.params.id, postedByEmployer: req.employer._id });
+        if (!job) return res.status(404).json({ success: false, message: 'Job not found.' });
+        res.json({ success: true, data: job });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// ─── POST NEW JOB (with optional PDF) ─────────────────────
+router.post('/jobs', protectEmployer, uploadResume.single('pdf'), async (req, res) => {
     try {
         if (req.employer.verificationStatus !== 'verified') {
             return res.status(403).json({
@@ -243,35 +256,69 @@ router.post('/jobs', protectEmployer, async (req, res) => {
             salary, applyLink, applyEmail, deadline, sector, country
         } = req.body;
 
+        // Parse JSON strings from FormData
+        const parsedSkills = typeof skills === 'string' ? JSON.parse(skills) : skills;
+        const parsedRequirements = typeof requirements === 'string' ? JSON.parse(requirements) : requirements;
+        const parsedResponsibilities = typeof responsibilities === 'string' ? JSON.parse(responsibilities) : responsibilities;
+        const parsedSalary = typeof salary === 'string' ? JSON.parse(salary) : salary;
+
+        let pdfUrl = null;
+        if (req.file) {
+            const result = await uploadBuffer(req.file.buffer, {
+                folder: 'jobvault/job-pdfs',
+                resource_type: 'raw',
+                format: 'pdf',
+            });
+            pdfUrl = result.secure_url;
+        }
+
         const job = await Job.create({
             title, category, location, remote, jobType, description,
-            requirements, responsibilities, skills, experienceLevel, experienceYears,
-            salary, applyLink, applyEmail, deadline, sector, country,
+            requirements: parsedRequirements, responsibilities: parsedResponsibilities,
+            skills: parsedSkills, experienceLevel, experienceYears,
+            salary: parsedSalary, applyLink, applyEmail, deadline, sector, country,
             company: req.employer.companyName,
             companyLogo: req.employer.companyLogo,
             source: 'employer',
             postedByEmployer: req.employer._id,
-            status: 'pending', // Always needs admin approval
+            status: 'pending',
+            ...(pdfUrl && { jobDescriptionPdf: pdfUrl }),
         });
 
         res.status(201).json({ success: true, message: 'Job submitted for admin review!', data: job });
     } catch (err) {
+        console.error('Post job error:', err);
         res.status(500).json({ success: false, message: err.message });
     }
 });
 
-// ─── EDIT JOB ─────────────────────────────────────────────
-router.put('/jobs/:id', protectEmployer, async (req, res) => {
+// ─── EDIT JOB (with optional PDF) ─────────────────────────
+router.put('/jobs/:id', protectEmployer, uploadResume.single('pdf'), async (req, res) => {
     try {
         const job = await Job.findOne({ _id: req.params.id, postedByEmployer: req.employer._id });
         if (!job) return res.status(404).json({ success: false, message: 'Job not found.' });
 
-        // Re-submit for review after editing
         const updates = { ...req.body, status: 'pending' };
-        const updatedJob = await Job.findByIdAndUpdate(req.params.id, updates, { new: true, runValidators: true });
 
+        // Parse JSON strings from FormData
+        if (typeof updates.skills === 'string') updates.skills = JSON.parse(updates.skills);
+        if (typeof updates.requirements === 'string') updates.requirements = JSON.parse(updates.requirements);
+        if (typeof updates.responsibilities === 'string') updates.responsibilities = JSON.parse(updates.responsibilities);
+        if (typeof updates.salary === 'string') updates.salary = JSON.parse(updates.salary);
+
+        if (req.file) {
+            const result = await uploadBuffer(req.file.buffer, {
+                folder: 'jobvault/job-pdfs',
+                resource_type: 'raw',
+                format: 'pdf',
+            });
+            updates.jobDescriptionPdf = result.secure_url;
+        }
+
+        const updatedJob = await Job.findByIdAndUpdate(req.params.id, updates, { new: true, runValidators: true });
         res.json({ success: true, message: 'Job updated and re-submitted for review.', data: updatedJob });
     } catch (err) {
+        console.error('Edit job error:', err);
         res.status(500).json({ success: false, message: err.message });
     }
 });

@@ -100,6 +100,10 @@ export default function EmployerJobsPage() {
                                             <span className="flex items-center gap-1"><Eye size={14} /> {job.viewCount || 0}</span>
                                         </div>
                                         <div className="flex items-center gap-2">
+                                            <Link to={`/employer/jobs/${job._id}/edit`}
+                                                className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-colors">
+                                                <Pencil size={16} />
+                                            </Link>
                                             <button onClick={() => handleDelete(job._id)}
                                                 className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors">
                                                 <Trash2 size={16} />

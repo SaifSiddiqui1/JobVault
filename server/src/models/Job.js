@@ -42,6 +42,7 @@ const jobSchema = new mongoose.Schema({
     // Employer Portal
     postedByEmployer: { type: mongoose.Schema.Types.ObjectId, ref: 'Employer' },
     applicationMethod: { type: String, enum: ['link', 'email', 'internal'], default: 'link' },
+    jobDescriptionPdf: { type: String }, // Cloudinary URL for JD PDF
 
     postedDate: { type: Date, default: Date.now },
     deadline: { type: Date },

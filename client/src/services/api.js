@@ -165,8 +165,13 @@ export const employerAPI = {
     getDashboard: () => employerApi.get('/employer/dashboard'),
     // Jobs
     getJobs: (params) => employerApi.get('/employer/jobs', { params }),
-    postJob: (data) => employerApi.post('/employer/jobs', data),
-    updateJob: (id, data) => employerApi.put(`/employer/jobs/${id}`, data),
+    getJob: (id) => employerApi.get(`/employer/jobs/${id}`),
+    postJob: (data) => employerApi.post('/employer/jobs', data, {
+        headers: data instanceof FormData ? { 'Content-Type': 'multipart/form-data' } : {},
+    }),
+    updateJob: (id, data) => employerApi.put(`/employer/jobs/${id}`, data, {
+        headers: data instanceof FormData ? { 'Content-Type': 'multipart/form-data' } : {},
+    }),
     deleteJob: (id) => employerApi.delete(`/employer/jobs/${id}`),
 }
 
