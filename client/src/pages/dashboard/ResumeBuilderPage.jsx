@@ -106,11 +106,18 @@ export default function ResumeBuilderPage() {
 
             {/* ── LEFT: Form Panel ── */}
             <div className="w-full lg:w-[44%] xl:w-[42%] flex flex-col border-r border-gray-200 dark:border-gray-800 overflow-hidden">
-                {/* Title bar */}
-                <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 flex-shrink-0">
-                    <div className="min-w-0 flex-1 mr-3">
+                {/* Premium Title bar */}
+                <div className="relative flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-800 bg-gradient-to-r from-gray-50 to-white dark:from-gray-900 dark:to-gray-950 flex-shrink-0 overflow-hidden">
+                    <div className="absolute inset-0 mesh-bg opacity-30 pointer-events-none" />
+                    <div className="absolute -left-10 top-0 w-32 h-32 rounded-full bg-violet-500/10 blur-[40px] pointer-events-none" />
+
+                    <div className="min-w-0 flex-1 mr-3 relative z-10">
+                        <div className="flex items-center gap-2 mb-1">
+                            <Sparkles size={14} className="text-violet-500" />
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-violet-600 dark:text-violet-400">JobVault AI Builder</span>
+                        </div>
                         <input value={resume.title} onChange={e => setResume(p => ({ ...p, title: e.target.value }))}
-                            className="font-heading font-bold text-gray-900 dark:text-white bg-transparent border-none focus:outline-none focus:ring-0 p-0 w-full text-base"
+                            className="font-heading font-bold text-xl text-gray-900 dark:text-white bg-transparent border-none focus:outline-none focus:ring-0 p-0 w-full"
                             placeholder="Resume title..." />
                     </div>
                     <div className="flex gap-2 flex-shrink-0">

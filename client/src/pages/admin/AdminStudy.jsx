@@ -106,7 +106,7 @@ export default function AdminStudy() {
                                 {m.isPremium && <span className="badge badge-danger text-[10px]">Premium</span>}
                             </div>
                             <p className="text-xs text-gray-400 mt-2">{m.viewCount} views · {m.downloadCount} downloads</p>
-                            {m.fileUrl && <a href={m.fileUrl} target="_blank" className="text-xs text-primary-600 hover:underline mt-1 block">View file →</a>}
+                            {m.fileUrl && <a href={m.fileUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-primary-600 hover:underline mt-1 block">View file →</a>}
                         </div>
                     ))}
                 </div>

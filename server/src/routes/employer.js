@@ -9,8 +9,8 @@ const { sendEmail } = require('../services/emailService');
 const { uploadResume } = require('../middleware/upload');
 const { uploadBuffer } = require('../config/cloudinary');
 
-// Helper: generate OTP
-const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
+// Helper: generate OTP using cryptographically secure randomInt
+const generateOTP = () => crypto.randomInt(100000, 999999).toString();
 
 const generateEmployerToken = (id) => {
     return jwt.sign({ id, type: 'employer' }, process.env.JWT_SECRET, {
@@ -27,9 +27,17 @@ router.post('/register', async (req, res) => {
             return res.status(400).json({ success: false, message: 'Please provide all required fields.' });
         }
 
+        if (password.length < 8) {
+            return res.status(400).json({ success: false, message: 'Password must be at least 8 characters long.' });
+        }
+        const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/;
+        if (!passwordRegex.test(password)) {
+            return res.status(400).json({ success: false, message: 'Password must contain at least one uppercase letter, one lowercase letter, one number and one special character.' });
+        }
+
         const exists = await Employer.findOne({ email });
         if (exists) {
-            return res.status(400).json({ success: false, message: 'An account with this email already exists.' });
+            return res.status(400).json({ success: false, message: 'Registration failed. Please use a different email or sign in.' });
         }
 
         const otp = generateOTP();
@@ -39,7 +47,7 @@ router.post('/register', async (req, res) => {
             contactName, companyName, email, password,
             companyWebsite, industry, companySize,
             otp, otpExpires,
-            isEmailVerified: true, // Auto-verify — admin verification is the real gate
+            isEmailVerified: false,
         });
 
         // Respond immediately — don't block on email
@@ -68,7 +76,7 @@ router.post('/register', async (req, res) => {
         }).catch(err => console.error('OTP email failed (non-blocking):', err.message));
     } catch (err) {
         console.error('Employer register error:', err);
-        res.status(500).json({ success: false, message: err.message });
+        res.status(500).json({ success: false, message: 'Registration failed. Please try again.' });
     }
 });
 
@@ -80,7 +88,11 @@ router.post('/verify-otp', async (req, res) => {
 
         if (!employer) return res.status(404).json({ success: false, message: 'Account not found.' });
         if (employer.isEmailVerified) return res.status(400).json({ success: false, message: 'Email already verified.' });
-        if (employer.otp !== otp) return res.status(400).json({ success: false, message: 'Invalid verification code.' });
+        
+        const isOtpValid = otp && employer.otp && otp.length === employer.otp.length && 
+                          crypto.timingSafeEqual(Buffer.from(otp), Buffer.from(employer.otp));
+        if (!isOtpValid) return res.status(400).json({ success: false, message: 'Invalid verification code.' });
+        
         if (new Date() > employer.otpExpires) return res.status(400).json({ success: false, message: 'Code expired. Please request a new one.' });
 
         employer.isEmailVerified = true;
@@ -104,7 +116,8 @@ router.post('/verify-otp', async (req, res) => {
             },
         });
     } catch (err) {
-        res.status(500).json({ success: false, message: err.message });
+        console.error('Verify OTP error:', err);
+        res.status(500).json({ success: false, message: 'Verification failed. Please try again.' });
     }
 });
 
@@ -130,7 +143,8 @@ router.post('/resend-otp', async (req, res) => {
 
         res.json({ success: true, message: 'New verification code sent.' });
     } catch (err) {
-        res.status(500).json({ success: false, message: err.message });
+        console.error('Resend OTP error:', err);
+        res.status(500).json({ success: false, message: 'Could not send code. Please try again.' });
     }
 });
 
@@ -164,7 +178,8 @@ router.post('/login', async (req, res) => {
             },
         });
     } catch (err) {
-        res.status(500).json({ success: false, message: err.message });
+        console.error('Employer login error:', err);
+        res.status(500).json({ success: false, message: 'Login failed. Please try again.' });
     }
 });
 
@@ -179,15 +194,28 @@ router.put('/profile', protectEmployer, async (req, res) => {
     try {
         const { companyName, companyWebsite, companyDescription, industry, companySize, headquartersLocation, contactName, companyLogo } = req.body;
 
+        // If company identity changes, reset verification status
+        const current = await Employer.findById(req.employer._id);
+        const needsReverification = companyName && companyName !== current.companyName;
+
         const employer = await Employer.findByIdAndUpdate(
             req.employer._id,
-            { companyName, companyWebsite, companyDescription, industry, companySize, headquartersLocation, contactName, companyLogo },
+            {
+                companyName, companyWebsite, companyDescription, industry, companySize,
+                headquartersLocation, contactName, companyLogo,
+                ...(needsReverification && { verificationStatus: 'pending' })
+            },
             { new: true, runValidators: true }
         );
 
-        res.json({ success: true, data: employer });
+        res.json({
+            success: true,
+            data: employer,
+            message: needsReverification ? 'Profile updated. Since company name was changed, your account is pending re-verification.' : 'Profile updated.'
+        });
     } catch (err) {
-        res.status(500).json({ success: false, message: err.message });
+        console.error('Update profile error:', err);
+        res.status(500).json({ success: false, message: 'Profile update failed. Please try again.' });
     }
 });
 
@@ -213,7 +241,10 @@ router.get('/dashboard', protectEmployer, async (req, res) => {
 // ─── LIST OWN JOBS ────────────────────────────────────────
 router.get('/jobs', protectEmployer, async (req, res) => {
     try {
-        const { status, page = 1, limit = 20 } = req.query;
+        const { status } = req.query;
+        let page = Math.max(1, parseInt(req.query.page) || 1);
+        let limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+
         const filter = { postedByEmployer: req.employer._id };
         if (status) filter.status = status;
 
@@ -256,11 +287,12 @@ router.post('/jobs', protectEmployer, uploadResume.single('pdf'), async (req, re
             salary, applyLink, applyEmail, deadline, sector, country
         } = req.body;
 
-        // Parse JSON strings from FormData
-        const parsedSkills = typeof skills === 'string' ? JSON.parse(skills) : skills;
-        const parsedRequirements = typeof requirements === 'string' ? JSON.parse(requirements) : requirements;
-        const parsedResponsibilities = typeof responsibilities === 'string' ? JSON.parse(responsibilities) : responsibilities;
-        const parsedSalary = typeof salary === 'string' ? JSON.parse(salary) : salary;
+        // Safely parse JSON strings from FormData — invalid JSON returns null
+        const safeJsonParse = (val) => { try { return typeof val === 'string' ? JSON.parse(val) : val; } catch { return null; } };
+        const parsedSkills = safeJsonParse(skills);
+        const parsedRequirements = safeJsonParse(requirements);
+        const parsedResponsibilities = safeJsonParse(responsibilities);
+        const parsedSalary = safeJsonParse(salary);
 
         let pdfUrl = null;
         if (req.file) {
@@ -288,7 +320,7 @@ router.post('/jobs', protectEmployer, uploadResume.single('pdf'), async (req, re
         res.status(201).json({ success: true, message: 'Job submitted for admin review!', data: job });
     } catch (err) {
         console.error('Post job error:', err);
-        res.status(500).json({ success: false, message: err.message });
+        res.status(500).json({ success: false, message: 'Failed to create job. Please try again.' });
     }
 });
 
@@ -298,13 +330,18 @@ router.put('/jobs/:id', protectEmployer, uploadResume.single('pdf'), async (req,
         const job = await Job.findOne({ _id: req.params.id, postedByEmployer: req.employer._id });
         if (!job) return res.status(404).json({ success: false, message: 'Job not found.' });
 
-        const updates = { ...req.body, status: 'pending' };
+        const allowedFields = ['title', 'category', 'location', 'remote', 'jobType', 'description', 'requirements', 'responsibilities', 'skills', 'experienceLevel', 'experienceYears', 'salary', 'applyLink', 'applyEmail', 'deadline', 'sector', 'country'];
+        const updates = { status: 'pending' };
+        allowedFields.forEach(f => {
+            if (req.body[f] !== undefined) updates[f] = req.body[f];
+        });
 
-        // Parse JSON strings from FormData
-        if (typeof updates.skills === 'string') updates.skills = JSON.parse(updates.skills);
-        if (typeof updates.requirements === 'string') updates.requirements = JSON.parse(updates.requirements);
-        if (typeof updates.responsibilities === 'string') updates.responsibilities = JSON.parse(updates.responsibilities);
-        if (typeof updates.salary === 'string') updates.salary = JSON.parse(updates.salary);
+        // Safely parse JSON strings from FormData — invalid JSON returns null
+        const safeJsonParse = (val) => { try { return typeof val === 'string' ? JSON.parse(val) : val; } catch { return null; } };
+        if (updates.skills !== undefined) updates.skills = safeJsonParse(updates.skills);
+        if (updates.requirements !== undefined) updates.requirements = safeJsonParse(updates.requirements);
+        if (updates.responsibilities !== undefined) updates.responsibilities = safeJsonParse(updates.responsibilities);
+        if (updates.salary !== undefined) updates.salary = safeJsonParse(updates.salary);
 
         if (req.file) {
             const result = await uploadBuffer(req.file.buffer, {
@@ -319,7 +356,7 @@ router.put('/jobs/:id', protectEmployer, uploadResume.single('pdf'), async (req,
         res.json({ success: true, message: 'Job updated and re-submitted for review.', data: updatedJob });
     } catch (err) {
         console.error('Edit job error:', err);
-        res.status(500).json({ success: false, message: err.message });
+        res.status(500).json({ success: false, message: 'Failed to update job. Please try again.' });
     }
 });
 
@@ -331,7 +368,8 @@ router.delete('/jobs/:id', protectEmployer, async (req, res) => {
 
         res.json({ success: true, message: 'Job deleted.' });
     } catch (err) {
-        res.status(500).json({ success: false, message: err.message });
+        console.error('Delete job error:', err);
+        res.status(500).json({ success: false, message: 'Failed to delete job. Please try again.' });
     }
 });
 

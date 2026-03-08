@@ -7,6 +7,7 @@ passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
     callbackURL: process.env.GOOGLE_CALLBACK_URL,
+    state: true,
 }, async (accessToken, refreshToken, profile, done) => {
     try {
         let user = await User.findOne({ googleId: profile.id });
@@ -25,7 +26,8 @@ passport.use(new GoogleStrategy({
         }
 
         // Create new user from Google profile
-        const username = (email?.split('@')[0] || profile.displayName.toLowerCase().replace(/\s+/g, '')) + Math.floor(Math.random() * 1000);
+        const randomSuffix = crypto.randomInt(1000, 9999);
+        const username = (email?.split('@')[0] || profile.displayName.toLowerCase().replace(/\s+/g, '')) + randomSuffix;
         user = await User.create({
             fullName: profile.displayName,
             username,
@@ -45,6 +47,7 @@ passport.use(new GitHubStrategy({
     clientSecret: process.env.GITHUB_CLIENT_SECRET,
     callbackURL: process.env.GITHUB_CALLBACK_URL,
     scope: ['user:email'],
+    state: true,
 }, async (accessToken, refreshToken, profile, done) => {
     try {
         let user = await User.findOne({ githubId: profile.id });
@@ -60,7 +63,8 @@ passport.use(new GitHubStrategy({
             }
         }
 
-        const username = (profile.username || 'user') + Math.floor(Math.random() * 1000);
+        const randomSuffix = crypto.randomInt(1000, 9999);
+        const username = (profile.username || 'user') + randomSuffix;
         user = await User.create({
             fullName: profile.displayName || profile.username,
             username,

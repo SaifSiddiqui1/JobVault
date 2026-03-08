@@ -60,12 +60,13 @@ router.post('/photo', protect, uploadImage.single('photo'), async (req, res, nex
 router.post('/resume', protect, uploadResume.single('resume'), async (req, res, next) => {
     try {
         if (!req.file) return res.status(400).json({ success: false, message: 'No file provided.' });
+        const safeFileName = req.file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
         const result = await uploadBuffer(req.file.buffer, {
             folder: `jobvault/resumes_profile/${req.user._id}`,
-            public_id: req.file.originalname,
+            public_id: safeFileName,
             resource_type: 'raw',
         });
-        const resumeData = { url: result.secure_url, originalName: req.file.originalname, uploadedAt: new Date() };
+        const resumeData = { url: result.secure_url, originalName: safeFileName, uploadedAt: new Date() };
         const user = await User.findByIdAndUpdate(req.user._id, { profileResume: resumeData }, { new: true });
 
         // Sync with Resume collection

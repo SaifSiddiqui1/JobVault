@@ -5,13 +5,21 @@ const { sendEmail } = require('../services/emailService');
 const passport = require('passport');
 const validateGlobalPhone = require('../utils/validatePhone');
 
-// Helper: generate 6-digit OTP
-const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
+// Helper: generate 6-digit OTP using cryptographically secure randomInt
+const generateOTP = () => crypto.randomInt(100000, 999999).toString();
 
 // ─── Register ────────────────────────────────────────────────────────────────
 exports.register = async (req, res, next) => {
     try {
         const { fullName, username, email, password, contactNumber, dateOfBirth } = req.body;
+
+        if (!password || password.length < 8) {
+            return res.status(400).json({ success: false, message: 'Password must be at least 8 characters long.' });
+        }
+        const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/;
+        if (!passwordRegex.test(password)) {
+            return res.status(400).json({ success: false, message: 'Password must contain at least one uppercase letter, one lowercase letter, one number and one special character.' });
+        }
 
         if (await User.findOne({ email })) {
             return res.status(400).json({ success: false, message: 'Email already registered.' });
@@ -38,8 +46,10 @@ exports.register = async (req, res, next) => {
             otp, otpExpires,
         });
 
-        // Always log OTP to console for local development
-        console.log(`\n📧 OTP for ${email}: ${otp}  (expires in 10 min)\n`);
+        // Log OTP to console for local development
+        if (process.env.NODE_ENV !== 'production') {
+            console.log(`\n📧 OTP for ${email}: ${otp}  (expires in 10 min)\n`);
+        }
 
         // Send OTP email (fails gracefully if RESEND_API_KEY not set)
         const emailSent = await sendEmail({
@@ -81,7 +91,11 @@ exports.verifyEmail = async (req, res, next) => {
 
         if (!user) return res.status(404).json({ success: false, message: 'User not found.' });
         if (user.isEmailVerified) return res.status(400).json({ success: false, message: 'Email already verified.' });
-        if (user.otp !== otp) return res.status(400).json({ success: false, message: 'Invalid OTP.' });
+        
+        const isOtpValid = otp && user.otp && otp.length === user.otp.length && 
+                          crypto.timingSafeEqual(Buffer.from(otp), Buffer.from(user.otp));
+        if (!isOtpValid) return res.status(400).json({ success: false, message: 'Invalid OTP.' });
+        
         if (user.otpExpires < new Date()) return res.status(400).json({ success: false, message: 'OTP expired.' });
 
         user.isEmailVerified = true;
@@ -131,7 +145,7 @@ exports.login = async (req, res, next) => {
         }).select('+password');
 
         if (!user) {
-            return res.status(401).json({ success: false, message: 'No account found with those details. Please sign up.' });
+            return res.status(401).json({ success: false, message: 'Invalid email or password.' });
         }
 
         // OAuth-only accounts have no password — direct them to use social login
@@ -145,7 +159,7 @@ exports.login = async (req, res, next) => {
 
         const passwordMatch = await user.comparePassword(password);
         if (!passwordMatch) {
-            return res.status(401).json({ success: false, message: 'Incorrect password. Please try again.' });
+            return res.status(401).json({ success: false, message: 'Invalid email or password.' });
         }
 
         if (!user.isEmailVerified) {
@@ -187,8 +201,10 @@ exports.forgotPassword = async (req, res, next) => {
         user.otpExpires = new Date(Date.now() + 15 * 60 * 1000);
         await user.save({ validateBeforeSave: false });
 
-        // Always log OTP to console for local development
-        console.log(`\n🔑 Password Reset OTP for ${email}: ${otp}  (expires in 15 min)\n`);
+        // Log OTP to console for local development
+        if (process.env.NODE_ENV !== 'production') {
+            console.log(`\n🔑 Password Reset OTP for ${email}: ${otp}  (expires in 15 min)\n`);
+        }
 
         const emailSent = await sendEmail({
             to: email,
@@ -217,7 +233,11 @@ exports.resetPassword = async (req, res, next) => {
         const { userId, otp, newPassword } = req.body;
         const user = await User.findById(userId).select('+otp +otpExpires');
         if (!user) return res.status(404).json({ success: false, message: 'User not found.' });
-        if (user.otp !== otp) return res.status(400).json({ success: false, message: 'Invalid OTP.' });
+        
+        const isOtpValid = otp && user.otp && otp.length === user.otp.length && 
+                          crypto.timingSafeEqual(Buffer.from(otp), Buffer.from(user.otp));
+        if (!isOtpValid) return res.status(400).json({ success: false, message: 'Invalid OTP.' });
+        
         if (user.otpExpires < new Date()) return res.status(400).json({ success: false, message: 'OTP expired.' });
 
         user.password = newPassword;

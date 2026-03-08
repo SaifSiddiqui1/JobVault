@@ -208,14 +208,25 @@ export default function AtsCheckerPage() {
     const canCheck = resumeText.trim().length > 50 && jobDescription.trim().length > 50
 
     return (
-        <div className="max-w-4xl mx-auto space-y-6 animate-fade-in">
-            <div>
-                <h1 className="font-heading text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                    <Target size={22} className="text-primary-500" /> ATS Score Checker
-                </h1>
-                <p className="text-gray-500 text-sm mt-1">
-                    Upload or paste your resume & job description — AI will score how well they match
-                </p>
+        <div className="space-y-6 animate-fade-in page-enter">
+            {/* Premium Hero */}
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-900 via-violet-900 to-primary-900 p-8 text-center sm:text-left">
+                <div className="absolute inset-0 mesh-bg opacity-30" />
+                <div className="absolute -left-16 -top-16 w-64 h-64 rounded-full bg-indigo-500/20 blur-[80px]" />
+                <div className="absolute right-0 bottom-0 w-96 h-96 rounded-full bg-violet-600/10 blur-[100px]" />
+                <div className="relative flex flex-col md:flex-row items-center gap-6">
+                    <div className="w-16 h-16 shrink-0 rounded-2xl bg-white/10 border border-white/20 backdrop-blur-md flex items-center justify-center shadow-2xl">
+                        <Target size={32} className="text-violet-300" />
+                    </div>
+                    <div>
+                        <h1 className="font-heading text-3xl font-extrabold text-white tracking-tight">
+                            ATS Score Checker <span className="ml-2 text-[11px] font-bold bg-violet-500/30 text-violet-200 px-2 py-0.5 rounded-full border border-violet-500/50 align-middle">PRO</span>
+                        </h1>
+                        <p className="text-violet-200/80 mt-2 max-w-2xl text-sm leading-relaxed">
+                            Optimize your resume against specific job requirements to beat Applicant Tracking Systems. Paste your resume and job description to get instant, actionable feedback.
+                        </p>
+                    </div>
+                </div>
             </div>
 
             {/* Pre-fill notice from job detail */}

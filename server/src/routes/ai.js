@@ -13,6 +13,9 @@ router.post('/ats-check', protect, async (req, res, next) => {
         if (!resumeText || !jobDescription) {
             return res.status(400).json({ success: false, message: 'Resume text and job description are required.' });
         }
+        if (resumeText.length > 20000 || jobDescription.length > 20000) {
+            return res.status(400).json({ success: false, message: 'Input text exceeds the maximum allowed length of 20000 characters.' });
+        }
 
         const result = await aiService.checkAtsScore(resumeText, jobDescription);
 
@@ -60,6 +63,9 @@ router.post('/generate-summary', protect, async (req, res, next) => {
 router.post('/cover-letter', protect, premiumOrAdmin, async (req, res, next) => {
     try {
         const { resumeId, jobDescription, companyName } = req.body;
+        if (jobDescription && jobDescription.length > 20000) {
+            return res.status(400).json({ success: false, message: 'Job description exceeds max length.' });
+        }
         const resume = await Resume.findOne({ _id: resumeId, user: req.user._id });
         if (!resume) return res.status(404).json({ success: false, message: 'Resume not found.' });
 
@@ -72,6 +78,9 @@ router.post('/cover-letter', protect, premiumOrAdmin, async (req, res, next) => 
 router.post('/skill-gap', protect, async (req, res, next) => {
     try {
         const { resumeId, jobDescription } = req.body;
+        if (jobDescription && jobDescription.length > 20000) {
+            return res.status(400).json({ success: false, message: 'Job description exceeds max length.' });
+        }
         const resume = await Resume.findOne({ _id: resumeId, user: req.user._id });
         if (!resume) return res.status(404).json({ success: false, message: 'Resume not found.' });
 
@@ -93,6 +102,9 @@ router.post('/generate-bio', protect, async (req, res, next) => {
 router.post('/interview-questions', protect, async (req, res, next) => {
     try {
         const { jobDescription, difficulty } = req.body;
+        if (jobDescription && jobDescription.length > 20000) {
+            return res.status(400).json({ success: false, message: 'Job description exceeds max length.' });
+        }
         const questions = await aiService.generateInterviewQuestions(jobDescription, difficulty);
         res.json({ success: true, data: questions });
     } catch (err) { next(err); }
@@ -126,6 +138,9 @@ router.post('/job-summarizer', protect, premiumOrAdmin, async (req, res, next) =
     try {
         const { jobDescription } = req.body;
         if (!jobDescription) return res.status(400).json({ success: false, message: 'Job description is required.' });
+        if (jobDescription.length > 20000) {
+            return res.status(400).json({ success: false, message: 'Job description exceeds max length.' });
+        }
 
         const summary = await aiService.summarizeJobDescription(jobDescription);
         res.json({ success: true, data: summary });

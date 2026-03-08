@@ -5,6 +5,11 @@ const crypto = require('crypto');
 const { protect } = require('../middleware/auth');
 const User = require('../models/User');
 
+// Enforce secrets at runtime initialization
+if (process.env.NODE_ENV === 'production' && (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET)) {
+    console.warn('WARNING: Razorpay credentials are missing in production!');
+}
+
 const razorpay = new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID || 'rzp_test_placeholder',
     key_secret: process.env.RAZORPAY_KEY_SECRET || 'rzp_secret_placeholder',
@@ -37,7 +42,7 @@ router.post('/create-order', protect, async (req, res, next) => {
     } catch (err) {
         console.error('Razorpay Order Error:', err);
         const errorMsg = err.error?.description || err.message || 'Failed to create payment order.';
-        res.status(500).json({ success: false, message: errorMsg, details: err });
+        res.status(500).json({ success: false, message: errorMsg });
     }
 });
 
@@ -50,12 +55,21 @@ router.post('/verify', protect, async (req, res, next) => {
             return res.status(400).json({ success: false, message: 'Invalid payment payload.' });
         }
 
-        const secret = process.env.RAZORPAY_KEY_SECRET || 'rzp_secret_placeholder';
+        const secret = process.env.RAZORPAY_KEY_SECRET;
+        if (!secret) {
+            return res.status(500).json({ success: false, message: 'Payment configuration error' });
+        }
+        
+        // Explicitly cast to strings to prevent NoSQL/Object injection crashes
+        const orderIdStr = String(razorpay_order_id);
+        const paymentIdStr = String(razorpay_payment_id);
+        const signatureStr = String(razorpay_signature);
+
         const expectedSignature = crypto.createHmac('sha256', secret)
-            .update(razorpay_order_id + '|' + razorpay_payment_id)
+            .update(orderIdStr + '|' + paymentIdStr)
             .digest('hex');
 
-        if (expectedSignature === razorpay_signature) {
+        if (crypto.timingSafeEqual(Buffer.from(expectedSignature), Buffer.from(signatureStr))) {
             // Payment verified, upgrade user
             const premiumExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
 

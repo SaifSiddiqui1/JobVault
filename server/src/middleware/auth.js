@@ -11,7 +11,7 @@ const protect = async (req, res, next) => {
             return res.status(401).json({ success: false, message: 'Not authorized. No token.' });
         }
 
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
         const user = await User.findById(decoded.id).select('-password');
 
         if (!user || !user.isActive) {
@@ -65,7 +65,7 @@ const protectEmployer = async (req, res, next) => {
 
         if (!token) return res.status(401).json({ success: false, message: 'Not authorized. No token.' });
 
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
         if (decoded.type !== 'employer') {
             return res.status(401).json({ success: false, message: 'Invalid token type.' });
         }

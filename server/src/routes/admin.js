@@ -14,9 +14,18 @@ const { aggregateJobs } = require('../services/jobAggregator');
 router.post('/webhook/n8n', async (req, res, next) => {
     try {
         const authHeader = req.headers.authorization;
-        const secret = process.env.N8N_WEBHOOK_SECRET || 'jobvault_n8n_secret_123';
-        if (!authHeader || authHeader !== `Bearer ${secret}`) {
-            return res.status(401).json({ success: false, message: 'Unauthorized webhook request' });
+        const secret = process.env.N8N_WEBHOOK_SECRET;
+        if (!secret) {
+            console.error('N8N_WEBHOOK_SECRET is not defined');
+            return res.status(500).json({ success: false, message: 'Server configuration error' });
+        }
+
+        const expectedAuth = `Bearer ${secret}`;
+        const isAuthValid = authHeader && authHeader.length === expectedAuth.length && 
+                            crypto.timingSafeEqual(Buffer.from(authHeader), Buffer.from(expectedAuth));
+
+        if (!isAuthValid) {
+            return res.status(401).json({ success: false, message: 'Unauthorized webhook' });
         }
 
         const jobsData = Array.isArray(req.body) ? req.body : [req.body];
@@ -55,7 +64,7 @@ router.post('/webhook/n8n', async (req, res, next) => {
                 remote: rawJob.remote || 'remote',
                 description: rawJob.description || title,
                 applyLink: url,
-                sourceJobId: rawJob.sourceJobId || `n8n-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+                sourceJobId: rawJob.sourceJobId || `n8n-${Date.now()}-${crypto.randomInt(1000, 9999)}`,
                 source: rawJob.source || 'n8n',
                 sourceUrl: url,
                 category: mapCategory(rawJob.category, title),
@@ -95,9 +104,15 @@ router.get('/stats', async (req, res, next) => {
 // ─── User Management ──────────────────────────────────────────────────────────
 router.get('/users', async (req, res, next) => {
     try {
-        const { page = 1, limit = 20, search, role } = req.query;
+        const { search, role } = req.query;
+        let page = Math.max(1, parseInt(req.query.page) || 1);
+        let limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+        
         const query = {};
-        if (search) query.$or = [{ fullName: { $regex: search, $options: 'i' } }, { email: { $regex: search, $options: 'i' } }];
+        if (search) {
+            const safeSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            query.$or = [{ fullName: { $regex: safeSearch, $options: 'i' } }, { email: { $regex: safeSearch, $options: 'i' } }];
+        }
         if (role) query.role = role;
 
         const total = await User.countDocuments(query);
@@ -128,7 +143,10 @@ router.put('/users/:id', async (req, res, next) => {
 // ─── Job Management (Admin Approval Workflow from PDF) ────────────────────────
 router.get('/jobs', async (req, res, next) => {
     try {
-        const { status = 'pending', page = 1, limit = 20, source, category } = req.query;
+        const { status = 'pending', source, category } = req.query;
+        let page = Math.max(1, parseInt(req.query.page) || 1);
+        let limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+
         const query = {};
         if (status !== 'all') query.status = status;
         if (source) query.source = source;
@@ -176,7 +194,11 @@ router.put('/jobs/:id/reject', async (req, res, next) => {
 // Manual job creation by admin
 router.post('/jobs', async (req, res, next) => {
     try {
-        const job = await Job.create({ ...req.body, source: 'manual', addedBy: req.user._id, status: 'approved', approvedAt: new Date() });
+        const allowedFields = ['title', 'category', 'location', 'remote', 'jobType', 'description', 'requirements', 'responsibilities', 'skills', 'experienceLevel', 'experienceYears', 'salary', 'applyLink', 'applyEmail', 'deadline', 'company', 'companyLogo', 'sector', 'country'];
+        const jobData = {};
+        allowedFields.forEach(f => { if (req.body[f] !== undefined) jobData[f] = req.body[f]; });
+        
+        const job = await Job.create({ ...jobData, source: 'manual', addedBy: req.user._id, status: 'approved', approvedAt: new Date() });
         res.status(201).json({ success: true, data: { job } });
     } catch (err) { next(err); }
 });
@@ -208,7 +230,12 @@ router.post('/study', uploadFile.single('file'), async (req, res, next) => {
             });
             fileUrl = result.secure_url;
         }
-        const material = await StudyMaterial.create({ ...req.body, fileUrl, uploadedBy: req.user._id });
+        
+        const allowedFields = ['title', 'description', 'category', 'type', 'level'];
+        const materialData = {};
+        allowedFields.forEach(f => { if (req.body[f] !== undefined) materialData[f] = req.body[f]; });
+        
+        const material = await StudyMaterial.create({ ...materialData, fileUrl, uploadedBy: req.user._id });
         res.status(201).json({ success: true, data: { material } });
     } catch (err) { next(err); }
 });
@@ -229,7 +256,10 @@ router.get('/employers', protect, adminOnly, async (req, res, next) => {
         const { status, search } = req.query;
         const filter = {};
         if (status) filter.verificationStatus = status;
-        if (search) filter.companyName = { $regex: search, $options: 'i' };
+        if (search) {
+            const safeSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            filter.companyName = { $regex: safeSearch, $options: 'i' };
+        }
         const employers = await Employer.find(filter).sort({ createdAt: -1 });
         res.json({ success: true, data: employers });
     } catch (err) { next(err); }

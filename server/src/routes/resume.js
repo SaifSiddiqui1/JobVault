@@ -27,7 +27,11 @@ router.get('/:id', protect, async (req, res, next) => {
 // Create new resume
 router.post('/', protect, async (req, res, next) => {
     try {
-        const resume = await Resume.create({ user: req.user._id, ...req.body });
+        const allowedFields = ['title', 'template', 'themeColor', 'fontStyle', 'personalInfo', 'summary', 'experience', 'education', 'skills', 'projects', 'certifications', 'customSections'];
+        const resumeData = {};
+        allowedFields.forEach(f => { if (req.body[f] !== undefined) resumeData[f] = req.body[f]; });
+        
+        const resume = await Resume.create({ user: req.user._id, ...resumeData });
         res.status(201).json({ success: true, data: { resume } });
     } catch (err) { next(err); }
 });
@@ -35,9 +39,13 @@ router.post('/', protect, async (req, res, next) => {
 // Update resume
 router.put('/:id', protect, async (req, res, next) => {
     try {
+        const allowedFields = ['title', 'template', 'themeColor', 'fontStyle', 'personalInfo', 'summary', 'experience', 'education', 'skills', 'projects', 'certifications', 'customSections'];
+        const updates = {};
+        allowedFields.forEach(f => { if (req.body[f] !== undefined) updates[f] = req.body[f]; });
+        
         const resume = await Resume.findOneAndUpdate(
             { _id: req.params.id, user: req.user._id },
-            { ...req.body, $inc: { version: 0 } },
+            { ...updates, $inc: { version: 0 } },
             { new: true, runValidators: true }
         );
         if (!resume) return res.status(404).json({ success: false, message: 'Resume not found.' });

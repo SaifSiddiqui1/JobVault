@@ -2,6 +2,8 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const mongoSanitize = require('express-mongo-sanitize');
+const xss = require('xss-clean');
 const morgan = require('morgan');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
@@ -25,6 +27,9 @@ require('./config/passport');
 
 const app = express();
 
+// Disable X-Powered-By header
+app.disable('x-powered-by');
+
 // Trust Render's reverse proxy for correct IP rate-limiting
 app.set('trust proxy', 1);
 
@@ -32,7 +37,28 @@ app.set('trust proxy', 1);
 connectDB();
 
 // Security Middleware
-app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+app.use(helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "https://checkout.razorpay.com"],
+            styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+            imgSrc: ["'self'", "data:", "https://res.cloudinary.com"],
+            connectSrc: ["'self'", "https://api.razorpay.com", "https://res.cloudinary.com"],
+            fontSrc: ["'self'", "https://fonts.gstatic.com"],
+            objectSrc: ["'none'"],
+            mediaSrc: ["'self'"],
+            frameSrc: ["'self'", "https://api.razorpay.com"],
+        },
+    },
+}));
+
+// Prevent NoSQL injection
+app.use(mongoSanitize());
+
+// Prevent XSS attacks
+app.use(xss());
 
 const allowedOrigins = [
     process.env.CLIENT_URL,
@@ -71,6 +97,28 @@ const authLimiter = rateLimit({
     message: 'Too many auth attempts, please try again in 15 minutes.',
 });
 app.use('/api/auth', authLimiter);
+app.use('/api/employer/login', authLimiter);
+app.use('/api/employer/register', authLimiter);
+
+// AI rate limiter (expensive operations)
+const aiLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000, // 1 hour
+    max: 15, // 15 AI requests per hour
+    message: 'AI request limit reached. Please try again in an hour.',
+    standardHeaders: true,
+});
+app.use('/api/ai', aiLimiter);
+
+// OTP rate limiter (very strict — prevents brute-force on 6-digit codes)
+const otpLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 5,
+    message: 'Too many OTP attempts. Please wait 15 minutes before trying again.',
+});
+app.use('/api/auth/verify-email', otpLimiter);
+app.use('/api/auth/resend-otp', otpLimiter);
+app.use('/api/employer/verify-otp', otpLimiter);
+app.use('/api/employer/resend-otp', otpLimiter);
 
 // Body parsing
 app.use(express.json({ limit: '10mb' }));
@@ -79,7 +127,7 @@ app.use(compression());
 
 // HTTP request logger
 if (process.env.NODE_ENV !== 'test') {
-    app.use(morgan('dev'));
+    app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 }
 
 // Passport
@@ -100,7 +148,6 @@ app.get('/health', (req, res) => {
         status: 'OK',
         timestamp: new Date(),
         uptime: process.uptime(),
-        env: process.env.NODE_ENV,
     });
 });
 
@@ -123,11 +170,19 @@ app.use((req, res) => {
 
 // Global error handler
 app.use((err, req, res, next) => {
-    console.error('Error:', err.stack);
+    if (process.env.NODE_ENV !== 'production') {
+        console.error('Error:', err.stack);
+    } else {
+        console.error('Error:', err.message);
+    }
     const statusCode = err.statusCode || 500;
+    const isProduction = process.env.NODE_ENV === 'production';
     res.status(statusCode).json({
         success: false,
-        message: err.message || 'Internal Server Error',
+        // Never leak internal error messages to clients in production
+        message: isProduction && statusCode === 500
+            ? 'An internal server error occurred. Please try again.'
+            : (err.message || 'Internal Server Error'),
         ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
     });
 });

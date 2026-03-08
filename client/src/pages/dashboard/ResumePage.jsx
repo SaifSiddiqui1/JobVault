@@ -5,6 +5,7 @@ import { resumeAPI } from '../../services/api'
 import useAuthStore from '../../store/authStore'
 import toast from 'react-hot-toast'
 import html2pdf from 'html2pdf.js'
+import DOMPurify from 'dompurify'
 
 export default function ResumePage() {
     const { user } = useAuthStore()
@@ -67,7 +68,7 @@ export default function ResumePage() {
 
                 // Create a temporary element to hold the HTML
                 const tempDiv = document.createElement('div');
-                tempDiv.innerHTML = data.html;
+                tempDiv.innerHTML = DOMPurify.sanitize(data.html, { USE_PROFILES: { html: true } });
                 tempDiv.style.width = '800px';
                 // Hide print bar
                 const printBar = tempDiv.querySelector('.print-bar');

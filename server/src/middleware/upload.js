@@ -19,7 +19,21 @@ const pdfFilter = (req, file, cb) => {
     }
 };
 
-const anyFilter = (req, file, cb) => cb(null, true);
+const safeDocFilter = (req, file, cb) => {
+    const allowedMimes = [
+        'application/pdf',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'text/plain',
+        'application/zip',
+        'application/x-zip-compressed'
+    ];
+    if (allowedMimes.includes(file.mimetype) || file.mimetype.startsWith('image/')) {
+        cb(null, true);
+    } else {
+        cb(new Error('Invalid file type! Only documents and images are allowed.'), false);
+    }
+};
 
 exports.uploadImage = multer({
     storage,
@@ -35,6 +49,6 @@ exports.uploadResume = multer({
 
 exports.uploadFile = multer({
     storage,
-    fileFilter: anyFilter,
+    fileFilter: safeDocFilter,
     limits: { fileSize: 20 * 1024 * 1024 }, // 20MB
 });

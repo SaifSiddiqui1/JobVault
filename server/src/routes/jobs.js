@@ -7,9 +7,11 @@ const Job = require('../models/Job');
 router.get('/', protect, async (req, res, next) => {
     try {
         const {
-            page = 1, limit = 20, category, remote, jobType, sector,
+            category, remote, jobType, sector,
             search, experienceLevel, country, minSalary, sort,
         } = req.query;
+        let page = Math.max(1, parseInt(req.query.page) || 1);
+        let limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
 
         const sortQuery = sort || '-approvedAt';
         const query = { status: 'approved', isActive: true };
@@ -24,9 +26,10 @@ router.get('/', protect, async (req, res, next) => {
             }
         } else if (category) {
             // Case-insensitive match, and map underscores to spaces
-            const safeCat = category.replace('_', ' ');
+            const safeCat = category.replace('_', ' ').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const safeCategoryStr = category.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             query.$or = [
-                { category: { $regex: category, $options: 'i' } },
+                { category: { $regex: safeCategoryStr, $options: 'i' } },
                 { title: { $regex: safeCat, $options: 'i' } }
             ];
         }

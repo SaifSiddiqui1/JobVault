@@ -1,7 +1,7 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
 
 
@@ -13,10 +13,14 @@ const checkAtsScore = async (resumeText, jobDescription) => {
 You are an expert ATS (Applicant Tracking System) analyzer. Analyze the following resume against the job description.
 
 JOB DESCRIPTION:
+<JOB_DESCRIPTION_START>
 ${jobDescription}
+</JOB_DESCRIPTION_END>
 
 RESUME:
+<RESUME_TEXT_START>
 ${resumeText}
+</RESUME_TEXT_START>
 
 Provide a detailed ATS analysis in the following JSON format ONLY (no extra text):
 {
@@ -38,8 +42,11 @@ Provide a detailed ATS analysis in the following JSON format ONLY (no extra text
 
     const result = await model.generateContent(prompt);
     const text = result.response.text();
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    return JSON.parse(jsonMatch[0]);
+    const firstBrace = text.indexOf('{');
+    const lastBrace = text.lastIndexOf('}');
+    if (firstBrace === -1 || lastBrace === -1) return {};
+    const jsonStr = text.substring(firstBrace, lastBrace + 1);
+    return JSON.parse(jsonStr);
 };
 
 /**
@@ -51,7 +58,9 @@ You are a professional resume writer and career coach. Enhance the following res
 ${targetRole ? `Target Role: ${targetRole}` : ''}
 
 Resume Data (JSON):
+<RESUME_DATA>
 ${JSON.stringify(resumeData, null, 2)}
+</RESUME_DATA>
 
 Return an enhanced version of the resume data as JSON with the SAME structure but with:
 1. Stronger action verbs in experience descriptions
@@ -64,8 +73,11 @@ Return ONLY the enhanced JSON, same schema as input.`;
 
     const result = await model.generateContent(prompt);
     const text = result.response.text();
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    return JSON.parse(jsonMatch[0]);
+    const firstBrace = text.indexOf('{');
+    const lastBrace = text.lastIndexOf('}');
+    if (firstBrace === -1 || lastBrace === -1) return {};
+    const jsonStr = text.substring(firstBrace, lastBrace + 1);
+    return JSON.parse(jsonStr);
 };
 
 /**
@@ -76,11 +88,13 @@ const generateSummary = async (resumeData) => {
 Write a compelling 3-4 sentence professional summary for this person's resume. Be specific, use strong language, and make it ATS-friendly.
 
 Profile Data:
+<USER_PROFILE>
 - Name: ${resumeData.personalInfo?.fullName}
 - Current Status: ${resumeData.currentStatus || 'Professional'}
 - Skills: ${resumeData.skills?.map(s => s.items?.join(', ')).join(', ')}
 - Experience: ${resumeData.experience?.map(e => `${e.position} at ${e.company}`).join('; ')}
 - Education: ${resumeData.education?.map(e => `${e.degree} from ${e.institution}`).join('; ')}
+</USER_PROFILE>
 
 Return ONLY the summary text, no quotes or labels.`;
 
@@ -99,11 +113,15 @@ Applicant: ${resumeData.personalInfo?.fullName}
 Company: ${companyName}
 
 Job Description:
+<JOB_DESCRIPTION>
 ${jobDescription}
+</JOB_DESCRIPTION>
 
 Resume Summary:
+<RESUME_DATA>
 - Skills: ${resumeData.skills?.flatMap(s => s.items).join(', ')}
 - Experience: ${resumeData.experience?.map(e => `${e.position} at ${e.company}: ${e.description}`).join('; ')}
+</RESUME_DATA>
 
 Write a 3-paragraph cover letter that:
 1. Opens with enthusiasm and the specific role
@@ -123,9 +141,20 @@ const analyzeSkillGap = async (resumeData, jobDescription) => {
     const prompt = `
 Analyze the skill gap between this resume and the job description.
 
-Job Description: ${jobDescription}
-Resume Skills: ${JSON.stringify(resumeData.skills)}
-Experience: ${resumeData.experience?.map(e => e.description).join(' ')}
+Job Description: 
+<JOB_DESCRIPTION>
+${jobDescription}
+</JOB_DESCRIPTION>
+
+Resume Skills: 
+<USER_SKILLS>
+${JSON.stringify(resumeData.skills)}
+</USER_SKILLS>
+
+Experience: 
+<USER_EXPERIENCE>
+${resumeData.experience?.map(e => e.description).join(' ')}
+</USER_EXPERIENCE>
 
 Return JSON ONLY:
 {
@@ -139,8 +168,11 @@ Return JSON ONLY:
 
     const result = await model.generateContent(prompt);
     const text = result.response.text();
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    return JSON.parse(jsonMatch[0]);
+    const firstBrace = text.indexOf('{');
+    const lastBrace = text.lastIndexOf('}');
+    if (firstBrace === -1 || lastBrace === -1) return {};
+    const jsonStr = text.substring(firstBrace, lastBrace + 1);
+    return JSON.parse(jsonStr);
 };
 
 /**
@@ -148,11 +180,14 @@ Return JSON ONLY:
  */
 const generateBio = async (userData) => {
     const prompt = `
-Create a compelling 100-150 word professional bio for:
+Create a compelling 100-150 word professional bio for the following person.
+
+<USER_DATA>
 Name: ${userData.fullName}
 Status: ${userData.currentStatus}
 Skills: ${userData.skills?.join(', ')}
 Location: ${userData.location}
+</USER_DATA>
 
 Write in third person. Be professional and engaging.
 Return ONLY the bio text.`;
@@ -168,7 +203,11 @@ const generateInterviewQuestions = async (jobDescription, difficulty = 'medium')
     const prompt = `
 Generate 10 interview questions for the following job. Include 3 behavioral, 4 technical, and 3 situational questions.
 
-Job Description: ${jobDescription}
+Job Description: 
+<JOB_DESCRIPTION>
+${jobDescription}
+</JOB_DESCRIPTION>
+
 Difficulty: ${difficulty}
 
 Return JSON ONLY:
@@ -180,8 +219,11 @@ Return JSON ONLY:
 
     const result = await model.generateContent(prompt);
     const text = result.response.text();
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    return JSON.parse(jsonMatch[0]);
+    const firstBrace = text.indexOf('{');
+    const lastBrace = text.lastIndexOf('}');
+    if (firstBrace === -1 || lastBrace === -1) return {};
+    const jsonStr = text.substring(firstBrace, lastBrace + 1);
+    return JSON.parse(jsonStr);
 };
 
 /**
@@ -191,9 +233,11 @@ const optimizeLinkedInProfile = async (resumeData) => {
     const prompt = `
 Analyze this resume data and provide specific, actionable suggestions to optimize the candidate's LinkedIn profile.
 
+<CANDIDATE_DATA>
 Profile Summary: ${resumeData.personalInfo?.fullName}
 Skills: ${JSON.stringify(resumeData.skills)}
 Experience: ${resumeData.experience?.map(e => `${e.position} at ${e.company}: ${e.description}`).join('; ')}
+</CANDIDATE_DATA>
 
 Return JSON ONLY:
 {
@@ -204,8 +248,11 @@ Return JSON ONLY:
 }`;
 
     const result = await model.generateContent(prompt);
-    const jsonMatch = result.response.text().match(/\{[\s\S]*\}/);
-    return JSON.parse(jsonMatch ? jsonMatch[0] : '{}');
+    const text = result.response.text();
+    const firstBrace = text.indexOf('{');
+    const lastBrace = text.lastIndexOf('}');
+    const jsonStr = (firstBrace !== -1 && lastBrace !== -1) ? text.substring(firstBrace, lastBrace + 1) : '{}';
+    return JSON.parse(jsonStr);
 };
 
 /**
@@ -215,9 +262,11 @@ const adviseCareerPath = async (resumeData) => {
     const prompt = `
 Act as a senior career coach. Based on this resume, provide a comprehensive structured career trajectory.
 
+<RESUME_DATA>
 Current Role: ${resumeData.currentStatus}
 Skills: ${JSON.stringify(resumeData.skills)}
 Degree/Education: ${JSON.stringify(resumeData.education)}
+</RESUME_DATA>
 
 Return JSON ONLY:
 {
@@ -233,8 +282,11 @@ Return JSON ONLY:
 }`;
 
     const result = await model.generateContent(prompt);
-    const jsonMatch = result.response.text().match(/\{[\s\S]*\}/);
-    return JSON.parse(jsonMatch ? jsonMatch[0] : '{}');
+    const text = result.response.text();
+    const firstBrace = text.indexOf('{');
+    const lastBrace = text.lastIndexOf('}');
+    const jsonStr = (firstBrace !== -1 && lastBrace !== -1) ? text.substring(firstBrace, lastBrace + 1) : '{}';
+    return JSON.parse(jsonStr);
 };
 
 /**
@@ -245,7 +297,9 @@ const summarizeJobDescription = async (jobDescription) => {
 Read this long, complicated job description and distil it down to its core requirements.
 
 Job Description:
+<JOB_DESCRIPTION>
 ${jobDescription}
+</JOB_DESCRIPTION>
 
 Return JSON ONLY:
 {
@@ -256,8 +310,11 @@ Return JSON ONLY:
 }`;
 
     const result = await model.generateContent(prompt);
-    const jsonMatch = result.response.text().match(/\{[\s\S]*\}/);
-    return JSON.parse(jsonMatch ? jsonMatch[0] : '{}');
+    const text = result.response.text();
+    const firstBrace = text.indexOf('{');
+    const lastBrace = text.lastIndexOf('}');
+    const jsonStr = (firstBrace !== -1 && lastBrace !== -1) ? text.substring(firstBrace, lastBrace + 1) : '{}';
+    return JSON.parse(jsonStr);
 };
 
 module.exports = {

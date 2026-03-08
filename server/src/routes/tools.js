@@ -8,8 +8,14 @@ const sharp = require('sharp');
 // Bio creator → delegated to AI service
 router.post('/bio', protect, async (req, res, next) => {
     try {
+        const { currentStatus, skills, location } = req.body;
         const aiService = require('../services/aiService');
-        const bio = await aiService.generateBio({ ...req.body, fullName: req.user.fullName });
+        const bio = await aiService.generateBio({
+            fullName: req.user.fullName,
+            currentStatus,
+            skills,
+            location
+        });
         res.json({ success: true, data: { bio } });
     } catch (err) { next(err); }
 });
@@ -18,12 +24,17 @@ router.post('/bio', protect, async (req, res, next) => {
 router.post('/resize-photo', protect, uploadImage.single('photo'), async (req, res, next) => {
     try {
         if (!req.file) return res.status(400).json({ success: false, message: 'No image provided.' });
-        const { width = 400, height = 400, format = 'jpeg' } = req.body;
+        
+        // Strict validation of user inputs to prevent Cloudinary transformation injection
+        const parsedWidth = Math.min(Math.max(Number(req.body.width) || 400, 10), 2000);
+        const parsedHeight = Math.min(Math.max(Number(req.body.height) || 400, 10), 2000);
+        const allowedFormats = ['jpeg', 'png', 'webp', 'jpg'];
+        const format = allowedFormats.includes(req.body.format) ? req.body.format : 'jpeg';
 
         const result = await uploadBuffer(req.file.buffer, {
             folder: `jobvault/tools/${req.user._id}`,
             transformation: [
-                { width: Number(width), height: Number(height), crop: 'fill' },
+                { width: parsedWidth, height: parsedHeight, crop: 'fill' },
                 { quality: 'auto' },
             ],
             format,
